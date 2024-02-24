@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
+# Authors: Théo Letailleur (Synacktiv), Mohammad Kazem Hassan Nejad (WithSecure)
+ 
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from binascii import unhexlify
@@ -28,13 +29,22 @@ def xor(a,b):
     return bytes([x^b for x in a])
 
 if len(sys.argv) < 2:
-    print("usage: python crusty_decrypto.py ./elf")
+    print("usage: python crusty_decrypto.py ./sample")
     exit()
 
-ELF = sys.argv[1]
+sample = sys.argv[1]
 
-with open(ELF, "rb") as ELFh:
-    data = ELFh.read()
+with open(sample, "rb") as sampleH:
+    data = sampleH.read()
+
+# Quick and dirty check for PE/ELF file sig
+if data[0:2] == b'MZ':
+    temp_path = b'c:/windows/temp/'
+elif data[1:4] == b'ELF':
+    temp_path = b'/tmp/'
+else:
+    print('File type check failed. Make sure the input is a PE or ELF file.')
+    exit()
 
 h = SHA256.new()
 h.update(data)
@@ -43,16 +53,15 @@ print(f"Sample SHA256sum: {h.hexdigest()}")
 
 end = data.find(b"|||||||||||||||||")
 start = end - 0x100
-start = start + data[start:end].find(b"/tmp/") + 5
+start = start + data[start:end].find(temp_path) + len(temp_path)
 ENCRYPTED =  unhexlify(data[start:end])
-
 # 40 80 f5 XX == xor bpl, XX
 before_xorkey = data.find(bytes.fromhex("FFFF4080F5"))
 XORKEY = data[before_xorkey+len(bytes.fromhex("FFFF4080F5"))]
 print(f"XOR KEY: {hex(XORKEY)}")
 encrypted_stage2 = xor(ENCRYPTED, XORKEY)
 
-start = start - len("/tmp/") - 32
+start = start - len(temp_path) - 32
 AESKEY = data[start:start+16]
 
 start += 16
